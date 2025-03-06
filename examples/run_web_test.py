@@ -3,6 +3,7 @@ import asyncio
 import logging
 from pathlib import Path
 from autogen_core import CancellationToken
+from autogen_agentchat.messages import TextMessage
 from autogen_agentchat.ui import Console
 from autogen_playwright.utils.common_utils import load_env_from_file
 
@@ -83,7 +84,7 @@ async def run_test(test_steps=None):
                 logger.info("Starting direct agent conversation for test execution...")
                 
                 # Use the web_tester to process the test message
-                response = await web_tester.on_messages([{"content": test_message, "source": "user"}], 
+                response = await web_tester.on_messages([TextMessage(content=test_message, source="user")], 
                                                       cancellation_token)
                 logger.info(f"Web tester response: {response.chat_message.content[:100]}...")
                 

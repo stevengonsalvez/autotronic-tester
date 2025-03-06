@@ -1,6 +1,7 @@
 import logging
 import os
 import re
+from pathlib import Path
 from typing import Optional, List, Dict, Any, Tuple, Union, Sequence
 
 from autogen_agentchat.agents import AssistantAgent, CodeExecutorAgent
@@ -16,73 +17,162 @@ from ..skills.playwright_skill import PlaywrightSkill
 
 logger = logging.getLogger(__name__)
 
-# Tool function to execute playwright operations
-def execute_playwright_operation(operation: str, **kwargs) -> str:
+# Tool functions for playwright operations
+def start_browser_session(scenario_name: str = "Web Test") -> str:
     """
-    Execute a Playwright operation.
+    Start a new browser session.
     
     Args:
-        operation: The name of the operation to execute
-        **kwargs: Arguments for the operation
+        scenario_name: Name of the test scenario
         
     Returns:
         String result of the operation
     """
     try:
-        # Initialize PlaywrightSkill if not already initialized
         skill = PlaywrightSkill()
+        result = skill.start_session(scenario_name)
+        return f"Browser session started for scenario: {scenario_name}"
+    except Exception as e:
+        return f"Error starting browser session: {str(e)}"
+
+def navigate_to_url(url: str, wait_for_load: bool = True) -> str:
+    """
+    Navigate to a URL.
+    
+    Args:
+        url: The URL to navigate to
+        wait_for_load: Whether to wait for the page to fully load
         
-        # Map operation to method
-        if operation == "start_session":
-            scenario_name = kwargs.get("scenario_name", "Web Test")
-            result = skill.start_session(scenario_name)
-            return f"Browser session started for scenario: {scenario_name}"
-            
-        elif operation == "navigate":
-            url = kwargs.get("url")
-            wait_for_load = kwargs.get("wait_for_load", True)
-            skill.navigate(url, wait_for_load)
-            return f"Navigated to URL: {url}"
-            
-        elif operation == "click_element":
-            selector = kwargs.get("selector")
-            skill.click_element(selector)
-            return f"Clicked element with selector: {selector}"
-            
-        elif operation == "fill_form":
-            selector = kwargs.get("selector")
-            value = kwargs.get("value")
-            skill.fill_form(selector, value)
-            return f"Filled form field {selector} with value: {value}"
-            
-        elif operation == "verify_element_exists":
-            selector = kwargs.get("selector")
-            result = skill.verify_element_exists(selector)
-            return f"Element {selector} exists: {result}"
-            
-        elif operation == "verify_text_content":
-            text = kwargs.get("text")
-            result = skill.verify_text_content(text)
-            return f"Text '{text}' exists on page: {result}"
-            
-        elif operation == "hover_element":
-            selector = kwargs.get("selector")
-            result = skill.hover_element(selector)
-            return f"Hover over element {selector}: {'Successful' if result else 'Failed'}"
-            
-        elif operation == "take_screenshot":
-            name = kwargs.get("name", "screenshot")
-            full_page = kwargs.get("full_page", False)
-            skill.take_screenshot(name, full_page)
-            return f"Screenshot taken: {name}"
-            
-        elif operation == "end_session":
-            status = kwargs.get("status", "Completed")
-            skill.end_session(status)
-            return f"Browser session ended with status: {status}"
-            
-        else:
-            return f"Unknown operation: {operation}"
+    Returns:
+        String result of the operation
+    """
+    try:
+        skill = PlaywrightSkill()
+        skill.navigate(url, wait_for_load)
+        return f"Navigated to URL: {url}"
+    except Exception as e:
+        return f"Error navigating to {url}: {str(e)}"
+
+def click_element(selector: str) -> str:
+    """
+    Click an element on the page.
+    
+    Args:
+        selector: CSS selector for the element to click
+        
+    Returns:
+        String result of the operation
+    """
+    try:
+        skill = PlaywrightSkill()
+        skill.click_element(selector)
+        return f"Clicked element with selector: {selector}"
+    except Exception as e:
+        return f"Error clicking element {selector}: {str(e)}"
+
+def fill_form_field(selector: str, value: str) -> str:
+    """
+    Fill a form field.
+    
+    Args:
+        selector: CSS selector for the form field
+        value: Value to enter in the field
+        
+    Returns:
+        String result of the operation
+    """
+    try:
+        skill = PlaywrightSkill()
+        skill.fill_form(selector, value)
+        return f"Filled form field {selector} with value: {value}"
+    except Exception as e:
+        return f"Error filling form field {selector}: {str(e)}"
+
+def verify_element(selector: str) -> str:
+    """
+    Verify an element exists on the page.
+    
+    Args:
+        selector: CSS selector for the element to verify
+        
+    Returns:
+        String result of the operation
+    """
+    try:
+        skill = PlaywrightSkill()
+        result = skill.verify_element_exists(selector)
+        return f"Element {selector} exists: {result}"
+    except Exception as e:
+        return f"Error verifying element {selector}: {str(e)}"
+
+def verify_text(text: str) -> str:
+    """
+    Verify text exists on the page.
+    
+    Args:
+        text: Text to verify on the page
+        
+    Returns:
+        String result of the operation
+    """
+    try:
+        skill = PlaywrightSkill()
+        result = skill.verify_text_content(text)
+        return f"Text '{text}' exists on page: {result}"
+    except Exception as e:
+        return f"Error verifying text '{text}': {str(e)}"
+
+def hover_over_element(selector: str) -> str:
+    """
+    Hover over an element on the page.
+    
+    Args:
+        selector: CSS selector for the element to hover over
+        
+    Returns:
+        String result of the operation
+    """
+    try:
+        skill = PlaywrightSkill()
+        result = skill.hover_element(selector)
+        return f"Hover over element {selector}: {'Successful' if result else 'Failed'}"
+    except Exception as e:
+        return f"Error hovering over element {selector}: {str(e)}"
+
+def take_page_screenshot(name: str = "screenshot", full_page: bool = False) -> str:
+    """
+    Take a screenshot of the page.
+    
+    Args:
+        name: Name for the screenshot file (without extension)
+        full_page: Whether to capture the full page or just the viewport
+        
+    Returns:
+        String result of the operation
+    """
+    try:
+        skill = PlaywrightSkill()
+        skill.take_screenshot(name, full_page)
+        return f"Screenshot taken: {name}"
+    except Exception as e:
+        return f"Error taking screenshot {name}: {str(e)}"
+
+def end_browser_session(status: str = "Completed") -> str:
+    """
+    End the browser session.
+    
+    Args:
+        status: Final status of the test
+        
+    Returns:
+        String result of the operation
+    """
+    try:
+        skill = PlaywrightSkill()
+        skill.end_session(status)
+        return f"Browser session ended with status: {status}"
+    except Exception as e:
+        return f"Error ending browser session: {str(e)}"
     
     except Exception as e:
         logger.error(f"Error executing Playwright operation: {str(e)}")
@@ -181,7 +271,17 @@ async def create_web_testing_agents(use_group_chat: bool = True) -> Union[
         name="web_tester",
         system_message=WEB_TESTER_PROMPT,
         model_client=model_client,
-        tools=[execute_playwright_operation],
+        tools=[
+            start_browser_session,
+            navigate_to_url,
+            click_element,
+            fill_form_field,
+            verify_element,
+            verify_text,
+            hover_over_element,
+            take_page_screenshot,
+            end_browser_session
+        ],
         description="A web testing agent that plans and executes web test scenarios."
     )
 
@@ -202,17 +302,20 @@ async def create_web_testing_agents(use_group_chat: bool = True) -> Union[
     )
 
     # Create the code executor agent
+    # Create working directory if it doesn't exist
+    work_dir = Path("workspace")
+    work_dir.mkdir(exist_ok=True)
+    
     code_executor = CodeExecutorAgent(
         name="code_executor",
         code_executor=LocalCommandLineCodeExecutor(
-            work_dir=None,
+            work_dir=work_dir,
             timeout=int(os.getenv('EXECUTION_TIMEOUT', '300'))  # 5 minutes default timeout
         ),
         description="An executor agent that runs Python code for test automation."
     )
     
-    # Register the playwright tool with the web_tester agent
-    web_tester.tools = [execute_playwright_operation]
+    # Tools are already registered during agent creation
     
     if use_group_chat:
         # Create termination conditions
@@ -222,7 +325,7 @@ async def create_web_testing_agents(use_group_chat: bool = True) -> Union[
         
         # Create the group chat
         group_chat = SelectorGroupChat(
-            agents=[web_tester, debug_agent, security_admin, code_executor],
+            participants=[web_tester, debug_agent, security_admin, code_executor],
             model_client=model_client,  # Use same model for selection
             termination_condition=termination,
             selector_func=selector_func,
