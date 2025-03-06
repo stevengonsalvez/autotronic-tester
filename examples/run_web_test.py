@@ -1,8 +1,9 @@
 import os
+import asyncio
 import logging
 from pathlib import Path
-import autogen
-from autogen_playwright.ops import print_session_summary, analyze_conversation
+from autogen_core import CancellationToken
+from autogen_agentchat.ui import Console
 from autogen_playwright.utils.common_utils import load_env_from_file
 
 # Configure logging
@@ -12,7 +13,7 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-def run_test(test_steps=None):
+async def run_test(test_steps=None):
     try:
         logger.info("Starting test execution...")
         
@@ -23,23 +24,7 @@ def run_test(test_steps=None):
         use_group_chat = os.getenv('USE_GROUP_CHAT', 'true').lower() == 'true'
         logger.info(f"LOG:  Using group chat mode: {use_group_chat}")
         
-        agents = create_web_testing_agents(use_group_chat=use_group_chat)
-        
-        if use_group_chat:
-            testing_agent, debug_agent, admin_agent, executor, manager = agents
-        else:
-            testing_agent, executor = agents
-        
-        # Start runtime logging with SQLite
-        db_path = Path("runtime_logs/autogen_logs.db")
-        db_path.parent.mkdir(exist_ok=True)
-        logging_config = {
-            "dbname": str(db_path),
-            "table_name": "agent_logs",
-            "create_table": True
-        }
-        logging_session_id = autogen.runtime_logging.start(config=logging_config)
-        logger.info(f"LOG:  Started autogen runtime logging with session ID: {logging_session_id}")
+        agents = await create_web_testing_agents(use_group_chat=use_group_chat)
         
         # Default test steps if none provided
         default_steps = [
@@ -71,42 +56,49 @@ def run_test(test_steps=None):
         """
         
         try:
-            logger.info("Initiating chat with test message...")
-            max_iterations = int(os.getenv('MAX_ITERATIONS', '10'))
+            logger.info("Initiating test with test message...")
             
-            # Initiate chat based on mode
+            # Create cancellation token for potential cancellation
+            cancellation_token = CancellationToken()
+            
+            # Initiate test based on mode
             if use_group_chat:
-                chat_result = executor.initiate_chat(
-                    manager,
-                    message=test_message,
-                    max_turns=max_iterations
-                )
+                web_tester, debug_agent, security_admin, code_executor, group_chat = agents
+                
+                # Run the group chat with the test message
+                logger.info("Starting group chat for test execution...")
+                stream = group_chat.run_stream(task=test_message, cancellation_token=cancellation_token)
+                
+                # Console UI for streaming the output
+                await Console(stream)
+                
+                # Retrieve the result for any post-processing
+                result = await group_chat.run(test_message, cancellation_token=cancellation_token)
+                logger.info(f"Group chat completed with {len(result.messages)} messages")
+                
             else:
-                chat_result = executor.initiate_chat(
-                    testing_agent,
-                    message=test_message,
-                    max_turns=max_iterations,
-                    summary_method="reflection_with_llm"
-                )
-            
+                web_tester, code_executor = agents
+                
+                # For simpler implementation, just have a conversation between the two agents
+                logger.info("Starting direct agent conversation for test execution...")
+                
+                # Use the web_tester to process the test message
+                response = await web_tester.on_messages([{"content": test_message, "source": "user"}], 
+                                                      cancellation_token)
+                logger.info(f"Web tester response: {response.chat_message.content[:100]}...")
+                
             return True
                 
-        finally:
-            # Stop runtime logging and print session info
-            autogen.runtime_logging.stop()
-            logger.info(f"LOG:  Stopped autogen runtime logging for session {logging_session_id}")
-            
-            # Print analytics
-            print("\n=== Test Analytics ===")
-            print_session_summary(logging_session_id, str(db_path))
-            analyze_conversation(logging_session_id, str(db_path))
+        except Exception as e:
+            logger.error(f"Test execution exception: {str(e)}", exc_info=True)
+            return False
             
     except Exception as e:
-        logger.error(f"Test execution failed: {str(e)}", exc_info=True)
-        print(f"Test execution failed: {str(e)}")
+        logger.error(f"Test setup failed: {str(e)}", exc_info=True)
+        print(f"Test setup failed: {str(e)}")
         return False
 
-if __name__ == "__main__":
+async def main():
     try:
         # Load environment variables
         env_path = load_env_from_file()
@@ -129,11 +121,14 @@ if __name__ == "__main__":
         else:
             steps = None
             
-        success = run_test(test_steps=steps)
-        exit_code = 0 if success else 1
-        os._exit(exit_code)
+        success = await run_test(test_steps=steps)
+        return 0 if success else 1
         
     except Exception as e:
         logger.error(f"Failed to initialize: {str(e)}", exc_info=True)
         print(f"Failed to initialize: {str(e)}")
-        os._exit(1)
+        return 1
+
+if __name__ == "__main__":
+    exit_code = asyncio.run(main())
+    os._exit(exit_code)

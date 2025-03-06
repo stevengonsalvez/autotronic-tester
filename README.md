@@ -1,6 +1,6 @@
 # AutoGen Playwright
 
-An experimental framework exploring automated web testing using Microsoft's AutoGen multi-agent framework combined with Playwright. This project aims to investigate the potential of LLM-powered agents in automated testing scenarios.
+An experimental framework exploring automated web testing using Microsoft's AutoGen multi-agent framework (v0.4) combined with Playwright. This project aims to investigate the potential of LLM-powered agents in automated testing scenarios.
 
 ## Overview
 This project explores the intersection of Large Language Models (LLMs) and automated testing by leveraging AutoGen's multi-agent architecture. The goal is to create more intelligent and adaptable automated tests that can understand test requirements in natural language and translate them into executable test scenarios.
@@ -35,21 +35,42 @@ pip install -e .
 - OpenAI API key or other supported LLM provider
 - AgentOps API key (optional, for monitoring)
 
+## AutoGen Version
+This project uses AutoGen 0.4, which introduces a new API with several improvements:
+- Asynchronous execution model for better performance
+- Enhanced team collaboration capabilities
+- Direct tool integration with assistant agents
+- Improved observability and control
+
 ## Quick Start
 ```python
-from autogen_playwright import testing_agent, user_proxy, PlaywrightSkill
+import asyncio
+from autogen_core import CancellationToken
+from autogen_agentchat.ui import Console
+from autogen_playwright import create_web_testing_agents
 
-def run_test():
-    # Initialize the test scenario
-    chat_result = user_proxy.initiate_chat(
-        testing_agent,
-        message="""
-        Test Scenario: Verify user login flow
-        1. Navigate to login page
-        2. Enter valid credentials
-        3. Verify successful login
-        """
-    )
+async def run_test():
+    # Create web testing agents
+    agents = await create_web_testing_agents(use_group_chat=True)
+    web_tester, debug_agent, security_admin, code_executor, group_chat = agents
+    
+    # Define test scenario
+    test_message = """
+    Test Scenario: Verify user login flow
+    1. Navigate to login page
+    2. Enter valid credentials
+    3. Verify successful login
+    """
+    
+    # Run the test
+    stream = group_chat.run_stream(task=test_message, 
+                                   cancellation_token=CancellationToken())
+    
+    # Display the results in real-time
+    await Console(stream)
+
+# Run the test
+asyncio.run(run_test())
 ```
 
 ## Configuration
@@ -89,12 +110,41 @@ The framework implements disk-based caching for LLM responses to optimize costs 
 - **Cost Savings**: Repeated test scenarios reuse cached responses
 
 ### Monitoring Cache Performance
-The framework includes built-in cache analytics:
-```python
-from autogen_playwright.ops import print_session_summary
+The framework includes built-in observability features leveraging AutoGen 0.4's event-driven architecture:
 
-# Get cache hit rates and token usage
-stats = print_session_summary(session_id="your_session_id")
+```python
+from autogen_core import CancellationToken
+from autogen_agentchat.agents import AssistantAgent
+from autogen_ext.models.openai import OpenAIChatCompletionClient
+from autogen_ext.models.cache import ChatCompletionCache
+from autogen_ext.cache_store.diskcache import DiskCacheStore
+from diskcache import Cache
+import tempfile
+
+# Initialize the model client with caching
+with tempfile.TemporaryDirectory() as cache_dir:
+    # Create base model client
+    model_client = OpenAIChatCompletionClient(
+        model="gpt-4o",
+        api_key="your-api-key"
+    )
+    
+    # Add caching
+    cache_store = DiskCacheStore(Cache(cache_dir))
+    cached_client = ChatCompletionCache(model_client, cache_store)
+    
+    # Create agent with cached client
+    agent = AssistantAgent(
+        name="web_tester",
+        system_message="You are a web testing agent.",
+        model_client=cached_client
+    )
+    
+    # Use in-memory or streaming to monitor performance
+    response = await agent.on_messages_stream(
+        [{"content": "Test this website", "source": "user"}],
+        CancellationToken()
+    )
 ```
 
 ## Project Goals

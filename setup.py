@@ -6,7 +6,9 @@ setup(
     packages=find_packages(where="src"),
     package_dir={"": "src"},
     install_requires=[
-        "pyautogen>=0.2.0",
+        "autogen-core>=0.4.0",
+        "autogen-agentchat>=0.4.0",
+        "autogen-ext>=0.4.0",
         "playwright>=1.41.0",
         "python-dotenv>=1.0.0",
         "agentops>=0.1.0",

@@ -1,32 +1,19 @@
 import os
 import logging
+import tempfile
 from typing import Dict, Any, Optional
 from .config import LLMConfig
-from autogen import Cache
+from autogen_core.models import ChatCompletionClient
+from autogen_ext.models.openai import OpenAIChatCompletionClient, AzureOpenAIChatCompletionClient
+from autogen_ext.models.cache import ChatCompletionCache, CHAT_CACHE_VALUE_TYPE
+from autogen_ext.cache_store.diskcache import DiskCacheStore
+from diskcache import Cache
 
 # Configure basic logging
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
-
-class LoggedCache(Cache):
-    """Cache implementation that logs hits and misses"""
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.logger = logging.getLogger(__name__)
-
-    def get(self, key: str) -> Optional[Dict]:
-        result = super().get(key)
-        if result is not None:
-            self.logger.info(f"LOG:  Cache HIT for key: {key[:50]}...")
-        else:
-            self.logger.info(f"LOG:  Cache MISS for key: {key[:50]}...")
-        return result
-
-    def put(self, key: str, value: Dict):
-        self.logger.info(f"LOG:  Caching response for key: {key[:50]}...")
-        return super().put(key, value)
 
 class LLMProvider:
     def __init__(self, config: Optional[LLMConfig] = None):
@@ -47,44 +34,80 @@ class LLMProvider:
         if env_var := provider_env_mapping.get(self.config.provider):
             os.environ[env_var] = self.config.api_key
     
-    def get_config(self) -> Dict[str, Any]:
-        base_config = {
+    def get_model_client(self) -> ChatCompletionClient:
+        """
+        Create and return a model client based on the configuration.
+        
+        Returns:
+            ChatCompletionClient: The configured model client
+        """
+        # Base parameters common to all providers
+        base_params = {
             "temperature": self.config.temperature,
-            "timeout": self.config.request_timeout
+            "timeout": self.config.request_timeout,
+            "seed": self.config.cache_seed,
         }
         
+        if self.config.max_tokens:
+            base_params["max_tokens"] = self.config.max_tokens
+        
+        # Create the appropriate model client based on provider
+        if self.config.provider == 'openai':
+            model_client = OpenAIChatCompletionClient(
+                model=self.config.model,
+                api_key=self.config.api_key,
+                **base_params
+            )
+        elif self.config.provider == 'azure':
+            model_client = AzureOpenAIChatCompletionClient(
+                azure_deployment=self.config.model,
+                api_key=self.config.api_key,
+                azure_endpoint=os.getenv('AZURE_OPENAI_ENDPOINT', ''),
+                api_version=os.getenv('AZURE_OPENAI_API_VERSION', '2023-07-01-preview'),
+                **base_params
+            )
+        else:
+            # For other providers, use a generic component config
+            # This would need to be expanded for other supported providers
+            provider_map = {
+                'anthropic': "AnthropicChatCompletionClient",
+                'cerebras': "CerebrasChatCompletionClient"
+            }
+            
+            provider_class = provider_map.get(self.config.provider)
+            if not provider_class:
+                raise ValueError(f"Unsupported provider: {self.config.provider}")
+                
+            config = {
+                "provider": provider_class,
+                "config": {
+                    "model": self.config.model,
+                    "api_key": self.config.api_key,
+                    **base_params
+                }
+            }
+            
+            model_client = ChatCompletionClient.load_component(config)
+        
+        # Add cache if enabled
         if self.config.cache_enable:
-            cache_kwargs = {}
-            if self.config.cache_path:
-                cache_kwargs['cache_path_root'] = self.config.cache_path
-                self.logger.info(f"LOG:  Using cache path: {self.config.cache_path}")
-            base_config["cache"] = LoggedCache.disk(**cache_kwargs)
+            cache_path = self.config.cache_path or tempfile.gettempdir()
+            self.logger.info(f"LOG:  Using cache path: {cache_path}")
+            
+            # Create cache store
+            cache_store = DiskCacheStore[CHAT_CACHE_VALUE_TYPE](
+                Cache(cache_path)
+            )
+            
+            # Wrap the model client with cache
+            model_client = ChatCompletionCache(
+                model_client,
+                cache_store
+            )
+            
             if self.config.cache_seed is not None:
-                base_config["cache_seed"] = self.config.cache_seed
                 self.logger.info(f"LOG:  Using cache seed: {self.config.cache_seed}")
         else:
             self.logger.warning("Cache is disabled!")
-        
-        if self.config.max_tokens:
-            base_config["max_tokens"] = self.config.max_tokens
             
-        provider_specific = {
-            "openai": {
-                "model": self.config.model,
-            },
-            "anthropic": {
-                "model": self.config.model,
-                "timeout": self.config.request_timeout,
-            },
-            "azure": {
-                "deployment_name": self.config.model,
-                "timeout": self.config.request_timeout,
-            },
-            "cerebras": {
-                "model": self.config.model,
-                "api_type": "cerebras",
-                "timeout": self.config.request_timeout,
-            }
-        }
-        
-        return {**base_config, **provider_specific.get(self.config.provider, {})}
+        return model_client

@@ -46,6 +46,7 @@ class PlaywrightSkill:
         # Set default timeout for all operations
         self.page.set_default_timeout(self.timeout)
         self.report.add_step("Started browser session", "Success")
+        return "Browser session started successfully"
         
     def navigate(self, url: str, wait_for_load: bool = True):
         """Navigate to a URL"""
