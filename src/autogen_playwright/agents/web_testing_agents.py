@@ -1,6 +1,7 @@
 import logging
 import os
 import re
+import asyncio
 from pathlib import Path
 from typing import Optional, List, Dict, Any, Tuple, Union, Sequence
 
@@ -9,10 +10,11 @@ from autogen_agentchat.teams import SelectorGroupChat
 from autogen_agentchat.messages import ChatMessage, TextMessage, AgentEvent
 from autogen_agentchat.conditions import TextMentionTermination, MaxMessageTermination
 from autogen_core import CancellationToken
+from autogen_core.models import ChatCompletionClient
 from autogen_ext.code_executors.local import LocalCommandLineCodeExecutor
 
 from ..llm.provider import LLMProvider
-from ..prompts import WEB_TESTER_PROMPT, DEBUG_AGENT_PROMPT, SECURITY_ADMIN_PROMPT
+from ..prompts import WEB_TESTER_PROMPT, DEBUG_AGENT_PROMPT, SECURITY_ADMIN_PROMPT, CODE_EXECUTOR_PROMPT
 from ..skills.playwright_skill import PlaywrightSkill
 
 logger = logging.getLogger(__name__)
@@ -254,7 +256,7 @@ def selector_func(messages: Sequence[AgentEvent | ChatMessage]) -> Optional[str]
     return None
 
 
-async def create_web_testing_agents(use_group_chat: bool = True) -> Union[
+async def create_web_testing_agents(use_group_chat: bool = True, model_client: Optional[ChatCompletionClient] = None) -> Union[
     Tuple[AssistantAgent, AssistantAgent, AssistantAgent, CodeExecutorAgent, SelectorGroupChat], 
     Tuple[AssistantAgent, CodeExecutorAgent]
 ]:
@@ -263,6 +265,7 @@ async def create_web_testing_agents(use_group_chat: bool = True) -> Union[
     
     Args:
         use_group_chat: Whether to use SelectorGroupChat for better conversation control (default: True)
+        model_client: Optional custom model client to use (default: None, will create a new one)
         
     Returns:
         If use_group_chat=True:
@@ -270,8 +273,9 @@ async def create_web_testing_agents(use_group_chat: bool = True) -> Union[
         If use_group_chat=False:
             Tuple[AssistantAgent, CodeExecutorAgent]
     """
-    # Get model client
-    model_client = LLMProvider().get_model_client()
+    # Get model client if not provided
+    if model_client is None:
+        model_client = LLMProvider().get_model_client()
     logger.info(f"LOG: Creating agents with model client")
     
     # Check if we should force code generation or tool usage

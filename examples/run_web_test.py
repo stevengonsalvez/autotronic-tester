@@ -8,6 +8,7 @@ from autogen_agentchat.ui import Console
 from autogen_playwright.utils.common_utils import load_env_from_file, format_code_for_logs
 from autogen_playwright.ops.event_logger import SQLiteEventLogger
 from autogen_playwright.ops.report_generator import ReportGenerator
+from autogen_playwright.llm.provider import LLMProvider
 
 # Configure logging
 logging.basicConfig(
@@ -20,13 +21,14 @@ async def run_test(test_steps=None):
     try:
         logger.info("Starting test execution...")
         
-        # Create the event logger but don't register it globally
+        # Create the event logger
         db_path = Path("./runtime_logs/autogen_logs.db")
         event_logger = SQLiteEventLogger(db_path=db_path)
         logger.info(f"Created SQLiteEventLogger with database at {db_path}")
         
         # Import after environment variables are loaded
         from autogen_playwright import create_web_testing_agents, PlaywrightSkill
+        from autogen_playwright.agents.web_testing_agents import create_web_testing_agents as create_agents_internal
         
         # Create agents with loaded environment
         use_group_chat = os.getenv('USE_GROUP_CHAT', 'true').lower() == 'true'
@@ -34,7 +36,12 @@ async def run_test(test_steps=None):
         logger.info(f"LOG: Using group chat mode: {use_group_chat}")
         logger.info(f"LOG: Using force mode: {force_mode}")
         
-        agents = await create_web_testing_agents(use_group_chat=use_group_chat)
+        # Create a custom LLMProvider with our event logger
+        llm_provider = LLMProvider(event_logger=event_logger)
+        model_client = llm_provider.get_model_client()
+        
+        # Create agents using our model client
+        agents = await create_agents_internal(use_group_chat=use_group_chat, model_client=model_client)
         
         # Default test steps if none provided
         default_steps = [

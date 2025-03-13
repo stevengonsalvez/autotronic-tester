@@ -13,6 +13,38 @@ EventPayload = Dict[str, Any]
 
 logger = logging.getLogger(__name__)
 
+class CustomJSONEncoder(json.JSONEncoder):
+    """Custom JSON encoder that handles non-serializable objects."""
+    def default(self, obj):
+        # Handle objects with __dict__ attribute
+        if hasattr(obj, '__dict__'):
+            return {k: v for k, v in obj.__dict__.items() 
+                   if not k.startswith('_') and not callable(v)}
+        # Handle objects with to_dict method
+        elif hasattr(obj, 'to_dict'):
+            return obj.to_dict()
+        # Handle objects with model_dump method (Pydantic v2)
+        elif hasattr(obj, 'model_dump'):
+            return obj.model_dump()
+        # Handle objects with dict method (Pydantic v1)
+        elif hasattr(obj, 'dict') and callable(obj.dict):
+            return obj.dict()
+        # Handle other types
+        try:
+            return str(obj)
+        except:
+            return f"<non-serializable: {type(obj).__name__}>"
+
+def serialize_payload(payload: Dict[str, Any]) -> str:
+    """Serialize a payload to JSON, handling non-serializable objects."""
+    try:
+        return json.dumps(payload, cls=CustomJSONEncoder)
+    except Exception as e:
+        logger.error(f"Error serializing payload: {e}")
+        # Fallback: convert to string representation
+        return json.dumps({"error": "Could not serialize payload", 
+                          "payload_str": str(payload)})
+
 class SQLiteEventLogger:
     """
     Event logger that logs AutoGen events to a SQLite database.
@@ -98,7 +130,7 @@ class SQLiteEventLogger:
                     event_type,
                     session_id,
                     agent_id,
-                    json.dumps(event_payload)
+                    serialize_payload(event_payload)
                 )
             )
             
@@ -115,8 +147,8 @@ class SQLiteEventLogger:
                     model = event_payload["response"].get("model", None)
                 
                 # Extract request and response
-                request = json.dumps(event_payload.get("messages", []))
-                response = json.dumps(event_payload.get("response", {}))
+                request = serialize_payload(event_payload.get("messages", []))
+                response = serialize_payload(event_payload.get("response", {}))
                 
                 cursor.execute(
                     """

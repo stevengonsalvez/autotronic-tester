@@ -167,3 +167,4 @@ agents/.claudesync/config.local.json
 agents/autogen-playwright/logs.db
 agents/autogen-playwright/agent_conversations.db
 workspace/
+runtime_logs/
