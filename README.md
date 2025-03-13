@@ -24,6 +24,9 @@ This project explores the intersection of Large Language Models (LLMs) and autom
   - Customizable LLM providers
   - Configurable browser settings
   - Environment-based configuration
+- **Execution Mode Control**:
+  - Control whether agents use tools directly or generate code
+  - Switch between modes using environment variables
 
 ## Installation
 ```bash
@@ -84,8 +87,31 @@ MODEL_NAME=gpt-4
 BROWSER_TYPE=chromium
 HEADLESS=true
 
+# Agent Behavior
+USE_GROUP_CHAT=true
+FORCE_MODE=auto  # Options: auto, code_generation, tool_usage
+
 # Monitoring
 AGENTOPS_API_KEY=your_api_key
+```
+
+### Execution Mode Control
+The framework provides control over how agents execute tasks through the `FORCE_MODE` environment variable:
+
+- **auto** (default): Let the LLM decide whether to use tools directly or generate code
+- **code_generation**: Force the agent to always generate complete Python code
+- **tool_usage**: Force the agent to always use tools directly
+
+This gives you flexibility in how tests are executed:
+```python
+# Force code generation mode
+os.environ['FORCE_MODE'] = 'code_generation'
+
+# Force tool usage mode
+os.environ['FORCE_MODE'] = 'tool_usage'
+
+# Let the LLM decide (default)
+os.environ['FORCE_MODE'] = 'auto'
 ```
 
 ## LLM Caching

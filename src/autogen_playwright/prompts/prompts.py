@@ -19,6 +19,22 @@ PlaywrightSkill Methods:
 - take_screenshot(name: str, full_page: bool = False) -> Captures page state
 - end_session() -> Closes browser and saves report
 
+IMPORTANT: When creating a class that inherits from PlaywrightSkill, always call the parent class's __init__ method first:
+```python
+class MyTest(PlaywrightSkill):
+    def __init__(self):
+        super().__init__()  # Initialize the parent class first
+        # Then add your own initialization code
+        self.start_session("My Test Scenario")
+```
+
+Note: By default, test reports are saved to the './reports' directory. You can customize this by passing a different path:
+```python
+from pathlib import Path
+custom_reports_dir = Path('./custom_reports')
+super().__init__(report_dir=custom_reports_dir)
+```
+
 Selector Strategy Priority:
 1. Common Components (like cookie banners):
    - Cookie Accept: '#onetrust-accept-btn-handler, [aria-label="Accept Cookies"], [aria-label="Accept"], button:has-text("Accept"), .accept-cookies-button'

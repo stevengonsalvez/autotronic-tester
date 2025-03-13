@@ -189,6 +189,9 @@ def selector_func(messages: Sequence[AgentEvent | ChatMessage]) -> Optional[str]
     Returns:
         The name of the next agent to speak, or None to use LLM-based selection
     """
+    # Check if we're in forced code generation mode
+    force_mode = os.getenv('FORCE_MODE', 'auto').lower()
+    
     if not messages:
         # Start with web_tester if no messages
         return "web_tester"
@@ -203,6 +206,11 @@ def selector_func(messages: Sequence[AgentEvent | ChatMessage]) -> Optional[str]
         # For other message types, we can't easily check content
         # Default to letting the LLM choose
         return None
+    
+    # In code generation mode, we want to always route web_tester to security_admin
+    if force_mode == 'code_generation' and last_speaker == "web_tester":
+        logger.info("In code generation mode, routing to security_admin for code review")
+        return "security_admin"
     
     # Check for execution errors or failures
     error_patterns = [
@@ -266,10 +274,28 @@ async def create_web_testing_agents(use_group_chat: bool = True) -> Union[
     model_client = LLMProvider().get_model_client()
     logger.info(f"LOG: Creating agents with model client")
     
+    # Check if we should force code generation or tool usage
+    force_mode = os.getenv('FORCE_MODE', 'auto').lower()
+    logger.info(f"LOG: Using force_mode: {force_mode}")
+    
+    # Determine which prompt to use based on force_mode
+    if force_mode == 'code_generation':
+        # Use a prompt that instructs the agent to always generate code
+        web_tester_prompt = WEB_TESTER_PROMPT + "\n\nIMPORTANT: ALWAYS generate complete Python code for all tasks. DO NOT use direct tool calls."
+        use_tools = False
+    elif force_mode == 'tool_usage':
+        # Use a prompt that instructs the agent to always use tools
+        web_tester_prompt = WEB_TESTER_PROMPT + "\n\nIMPORTANT: ALWAYS use the provided tools directly. DO NOT generate complete Python code."
+        use_tools = True
+    else:
+        # Default auto mode - let the LLM decide
+        web_tester_prompt = WEB_TESTER_PROMPT
+        use_tools = True
+    
     # Create the testing agent
     web_tester = AssistantAgent(
         name="web_tester",
-        system_message=WEB_TESTER_PROMPT,
+        system_message=web_tester_prompt,
         model_client=model_client,
         tools=[
             start_browser_session,
@@ -281,7 +307,7 @@ async def create_web_testing_agents(use_group_chat: bool = True) -> Union[
             hover_over_element,
             take_page_screenshot,
             end_browser_session
-        ],
+        ] if use_tools else [],
         description="A web testing agent that plans and executes web test scenarios."
     )
 

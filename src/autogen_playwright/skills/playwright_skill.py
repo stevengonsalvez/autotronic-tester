@@ -1,17 +1,21 @@
 from typing import Optional
+import os
+import logging
 from pathlib import Path
 from playwright.sync_api import sync_playwright, TimeoutError as PlaywrightTimeout
 from ..reporting.test_reporter import TestReport
 
+logger = logging.getLogger(__name__)
+
 class PlaywrightSkill:
-    def __init__(self, report_dir: Optional[Path] = None, reporting_enabled: bool = True,
+    def __init__(self, report_dir: Optional[Path] = Path('./reports'), reporting_enabled: bool = True,
                  timeout: int = 6000, slow_mo: int = 100):
         """
         Initialize PlaywrightSkill
         Args:
             report_dir: Custom report directory (defaults to ./reports)
             reporting_enabled: Whether to generate reports (defaults to True)
-            timeout: Default timeout in milliseconds for actions (default 5000ms)
+            timeout: Default timeout in milliseconds for actions (default 6000ms)
             slow_mo: Delay between actions in milliseconds (default 100ms)
         """
         self.browser = None
@@ -25,6 +29,10 @@ class PlaywrightSkill:
         
     def start_session(self, scenario_name: str):
         """Start a new browser session"""
+        # Ensure report directory exists
+        if self.report_dir:
+            self.report_dir.mkdir(parents=True, exist_ok=True)
+            
         self.report = TestReport(
             scenario_name,
             report_dir=self.report_dir,
@@ -32,9 +40,14 @@ class PlaywrightSkill:
         )
         playwright = sync_playwright().start()
         
-        # Launch browser in headed mode with slower execution for visibility
+        # Get headless mode from environment variable, default to False if not set
+        headless_str = os.getenv('BROWSER_HEADLESS', 'false').lower()
+        headless = headless_str == 'true'
+        logger.info(f"Starting browser with headless={headless} (from BROWSER_HEADLESS={headless_str})")
+        
+        # Launch browser with headless mode from environment variable
         self.browser = playwright.chromium.launch(
-            headless=True,  # Show the browser
+            headless=headless,  # Use headless setting from environment
             slow_mo=self.slow_mo  # Add delay between actions for visibility
         )
         
