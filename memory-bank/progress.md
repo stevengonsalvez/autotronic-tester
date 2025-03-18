@@ -1,22 +1,27 @@
 # Progress
 
 ## What Works (Current Status)
-The current implementation using AutoGen 0.2 is fully functional with the following capabilities:
+The implementation using AutoGen 0.4 is now functional with the following capabilities:
 
 1. **Agent Framework**:
    - Multiple specialized agents work together to execute tests
-   - Custom speaker selection controls conversation flow
+   - Custom speaker selection controls conversation flow with SelectorGroupChat
    - Error handling and debugging support
+   - Asynchronous execution with the new AutoGen 0.4 API
 
 2. **Browser Automation**:
-   - PlaywrightSkill provides comprehensive browser control
-   - Support for navigation, clicking, form filling, and other interactions
+   - Two browser automation approaches supported:
+     - PlaywrightSkill provides step-by-step browser control with explicit actions
+     - BrowserUseSkill offers natural language instruction-based automation
+   - Support for navigation, interaction, and verification
    - Error handling and recovery mechanisms
+   - Screenshots capture test execution evidence
 
 3. **Test Execution**:
    - Natural language test instructions are executed against web applications
    - Test results are captured and reported
    - Screenshots provide visual evidence
+   - Tool-based execution integrated with assistant agents
 
 4. **Reporting**:
    - Comprehensive test reports are generated
@@ -25,11 +30,12 @@ The current implementation using AutoGen 0.2 is fully functional with the follow
 
 ## What's Left to Build
 
-### Critical Path (AutoGen 0.4 Migration)
+### Critical Path (Complete)
 
 1. **Dependencies Update**:
    - [DONE] Update requirements.txt with new AutoGen 0.4 packages
    - [DONE] Update setup.py with new package requirements
+   - [DONE] Add browser-use and langchain dependencies
 
 2. **Agent Implementation**:
    - [DONE] Rewrite web_testing_agents.py to use the new agent structure
@@ -44,6 +50,7 @@ The current implementation using AutoGen 0.2 is fully functional with the follow
 4. **Tool Integration**:
    - [DONE] Adapt PlaywrightSkill to work as a tool with assistant agents
    - [DONE] Update tool execution pattern
+   - [DONE] Create BrowserUseSkill for natural language browser automation
 
 5. **Message Handling**:
    - [DONE] Update message structure to use new message types
@@ -51,42 +58,58 @@ The current implementation using AutoGen 0.2 is fully functional with the follow
 
 6. **Examples and Tests**:
    - [DONE] Update run_web_test.py to use new API
+   - [DONE] Create browser_use_example.py to demonstrate browser-use integration
    - [TODO] Update tests to verify refactored implementation
 
-### Enhanced Features (Post-Migration)
+### Enhanced Features 
 
-1. **Streaming Support**:
+1. **Multiple Browser Approaches**:
+   - [DONE] Create BrowserUseSkill implementation with Agent-based approach
+   - [DONE] Create example script for browser-use
+   - [DONE] Document browser-use integration
+   - [TODO] Create selection mechanism for different approaches
+
+2. **Natural Language Instruction Enhancement**:
+   - [TODO] Create prompt templates for effective browser-use instructions
+   - [TODO] Implement instruction optimization for common test scenarios
+   - [TODO] Add feedback mechanism for instruction quality
+
+3. **Streaming Support**:
    - [TODO] Implement streaming response handling for real-time feedback
    - [TODO] Add progress indicators during test execution
 
-2. **Improved Debugging**:
+4. **Improved Debugging**:
    - [TODO] Enhance debug agent capabilities with new AutoGen 0.4 features
    - [TODO] Add more detailed error analysis
+   - [TODO] Improve error handling for browser-use
 
-3. **Enhanced Reporting**:
+5. **Enhanced Reporting**:
    - [TODO] Improve test report format and content
    - [TODO] Add metrics and analytics
+   - [TODO] Support reporting for browser-use tests
 
 ## Known Issues
 
-1. **AutoGen 0.2 Limitations**:
-   - Limited flexibility in conversation control
-   - Complex tool integration through UserProxyAgent
-   - No native streaming support
+1. **Browser-use Integration**:
+   - Requires additional LLM calls which increases token usage
+   - Less precise control compared to Playwright
+   - Error recovery may be more challenging with autonomous agent
+   - Instruction ambiguity can lead to unexpected behavior
 
 2. **Migration Challenges**:
-   - Significant API changes from 0.2 to 0.4
-   - Asynchronous execution model requires careful refactoring
+   - Asynchronous execution model requires careful testing
    - Message format changes require careful adaptation
+   - Tool execution differences between AutoGen 0.2 and 0.4
 
 3. **Technical Debt**:
    - Some hardcoded configuration values need to be made configurable
    - Better separation of concerns in some modules
+   - Need for a unified reporting system across approaches
 
 ## Priorities for Next Phase
 
-1. Complete the core migration to AutoGen 0.4
-2. Ensure all existing functionality works with the new implementation
-3. Add comprehensive tests for the refactored code
-4. Update documentation to reflect the new API
-5. Add enhanced features leveraging AutoGen 0.4 capabilities
+1. Create a unified configuration system for selecting automation approach
+2. Add comprehensive tests for both browser automation approaches
+3. Enhance error handling and reporting for browser-use
+4. Create instruction templates for common test scenarios
+5. Improve integration between AutoGen agents and browser-use agent
