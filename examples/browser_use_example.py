@@ -51,7 +51,8 @@ async def run_test_with_browser_use():
         
         skill = BrowserUseSkill(
             screenshot_dir=screenshots_dir,
-            headless=headless
+            headless=headless,
+            skip_test=True  # Skip the initial test that goes to Google
         )
         logger.info("Created BrowserUseSkill instance")
         
@@ -72,9 +73,10 @@ async def run_test_with_browser_use():
         
         # Format steps as a single task
         task = "\n".join([f"{i+1}. {step}" for i, step in enumerate(test_steps)])
-        task = f"""Execute the following test steps:
+        task = f"""Execute the following test steps EXACTLY as they are written, without searching for any information or visiting Google first. Start directly with step 1:
 {task}
 
+IMPORTANT: DO NOT visit Google or search for any information first. Begin IMMEDIATELY with step 1 - navigating to ee.co.uk.
 Please take screenshots at each step. Make sure to capture evidence of each important action.
 """
         
@@ -99,62 +101,8 @@ Please take screenshots at each step. Make sure to capture evidence of each impo
     except Exception as e:
         logger.error(f"Error running test: {str(e)}", exc_info=True)
         return 1
-        
-async def run_custom_test(steps=None):
-    """
-    Run a test with custom steps
-    
-    Args:
-        steps: List of steps to execute (defaults to None)
-    """
-    try:
-        # Load environment variables
-        load_dotenv()
-        
-        # Create BrowserUseSkill instance
-        skill = BrowserUseSkill()
-        await skill.setup()
-        
-        # Use default steps if none provided
-        if not steps:
-            steps = [
-                "Navigate to google.com",
-                "Search for 'browser-use github'",
-                "Click on the first GitHub result",
-                "Summarize the project's description"
-            ]
-        
-        # Format steps as a single task
-        task = "\n".join([f"{i+1}. {step}" for i, step in enumerate(steps)])
-        task = f"Execute the following test steps:\n{task}\n\nTake screenshots for evidence."
-        
-        logger.info(f"Executing custom task:\n{task}")
-        
-        # Execute the task
-        result = await skill.execute_task(task)
-        logger.info(f"Custom task result: {result}")
-        
-        # Clean up
-        await skill.cleanup()
-        
-        return 0
-    except Exception as e:
-        logger.error(f"Error running custom test: {str(e)}", exc_info=True)
-        return 1
 
 if __name__ == "__main__":
-    # Get test steps from command line arguments
-    import argparse
-    
-    parser = argparse.ArgumentParser(description='Run a browser-use test')
-    parser.add_argument('--custom', action='store_true', help='Run the custom test example')
-    args = parser.parse_args()
-    
-    if args.custom:
-        # Run custom test
-        exit_code = asyncio.run(run_custom_test())
-    else:
-        # Run the EE example
-        exit_code = asyncio.run(run_test_with_browser_use())
-    
+    # Run the EE example
+    exit_code = asyncio.run(run_test_with_browser_use())
     os._exit(exit_code)

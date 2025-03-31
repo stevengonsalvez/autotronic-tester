@@ -29,7 +29,10 @@ class LLMConfig:
         api_key = os.getenv('LLM_API_KEY')
         if not api_key:
             raise ValueError("LLM_API_KEY environment variable must be set")
-            
+        
+        # Debug log API key (first 4 chars only for security)
+        logger.info(f"LOG:  LLM_API_KEY: {api_key[:4]}...")
+        
         # Get max_total_tokens from env, default to None if not set
         max_total_tokens_str = os.getenv('LLM_MAX_TOTAL_TOKENS')
         max_total_tokens = int(max_total_tokens_str) if max_total_tokens_str else None
@@ -48,5 +51,6 @@ class LLMConfig:
             max_total_tokens=max_total_tokens
         )
         
+        # Log the final configuration (excluding sensitive data)
         logger.info(f"LOG:  Created config with provider: {config.provider}, model: {config.model}")
         return config

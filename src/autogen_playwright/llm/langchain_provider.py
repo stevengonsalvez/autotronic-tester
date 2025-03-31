@@ -6,6 +6,8 @@ as the rest of the framework.
 import os
 import logging
 from typing import Optional, Dict, Any, Union
+import json
+import httpx
 
 from .config import LLMConfig
 
@@ -24,9 +26,9 @@ class LangChainProvider:
         Args:
             config: LLMConfig instance (will load from environment if None)
         """
+        self.logger = logging.getLogger(__name__)
         self.config = config or LLMConfig.from_env()
         self._set_provider_env_vars()
-        self.logger = logging.getLogger(__name__)
         
     def _set_provider_env_vars(self):
         """Map LLM_API_KEY to provider-specific environment variables"""
@@ -39,6 +41,11 @@ class LangChainProvider:
         
         if env_var := provider_env_mapping.get(self.config.provider):
             os.environ[env_var] = self.config.api_key
+            self.logger.info(f"LOG:  Mapped LLM_API_KEY to {env_var}")
+            # Debug log the first 4 chars of the mapped key
+            self.logger.info(f"LOG:  {env_var}: {self.config.api_key[:4]}...")
+        else:
+            self.logger.warning(f"LOG:  No environment variable mapping found for provider: {self.config.provider}")
     
     def get_langchain_llm(self):
         """
@@ -48,26 +55,58 @@ class LangChainProvider:
             A LangChain LLM instance (OpenAI, Anthropic, etc.)
         """
         try:
-            # Import here to make dependencies optional
             if self.config.provider == 'openai':
                 from langchain_openai import ChatOpenAI
+                import json
                 
-                # Map model names if needed
-                model_mapping = {
-                    'gpt-4': 'gpt-4',
-                    'gpt-4-turbo': 'gpt-4-turbo-preview',
-                    'gpt-4o': 'gpt-4o'
-                }
+                # Enable debug logging for httpx
+                httpx_logger = logging.getLogger("httpx")
+                httpx_logger.setLevel(logging.DEBUG)
                 
-                model_name = model_mapping.get(self.config.model, self.config.model)
-                
+                model_name = self.config.model
                 self.logger.info(f"Creating ChatOpenAI with model: {model_name}")
+                self.logger.info(f"Using temperature: {self.config.temperature}")
+                self.logger.info(f"Using request timeout: {self.config.request_timeout}")
+                self.logger.info(f"OPENAI_API_KEY environment variable is set: {'OPENAI_API_KEY' in os.environ}")
+                self.logger.info(f"OPENAI_API_KEY length: {len(os.getenv('OPENAI_API_KEY', ''))}")
                 
-                return ChatOpenAI(
+                # Create a test request to verify the configuration
+                test_request = {
+                    "model": model_name,
+                    "messages": [{"role": "user", "content": "test"}],
+                    "temperature": self.config.temperature
+                }
+                self.logger.info(f"Test request configuration: {json.dumps(test_request, indent=2)}")
+                
+                # Create the ChatOpenAI instance with explicit configuration
+                llm = ChatOpenAI(
                     model=model_name,
                     temperature=self.config.temperature,
-                    request_timeout=self.config.request_timeout
+                    request_timeout=self.config.request_timeout,
+                    openai_api_key=os.getenv('OPENAI_API_KEY'),  # Explicitly pass the API key
+                    max_retries=3,  # Limit retries to 3
+                    streaming=False,  # Disable streaming to simplify error handling
+                    verbose=True  # Enable verbose logging
                 )
+                
+                # Test the LLM with a simple request
+                try:
+                    self.logger.info("Testing LLM with a simple request...")
+                    response = llm.invoke("test")
+                    self.logger.info(f"Test response: {response}")
+                    
+                    # Log the actual request that was made
+                    if hasattr(llm, 'client') and hasattr(llm.client, '_last_request'):
+                        self.logger.info(f"Last request made: {json.dumps(llm.client._last_request, indent=2)}")
+                except Exception as e:
+                    self.logger.error(f"Test request failed: {str(e)}")
+                    if hasattr(e, 'response'):
+                        self.logger.error(f"Response status: {e.response.status_code}")
+                        self.logger.error(f"Response body: {e.response.text}")
+                    raise
+                
+                self.logger.info("ChatOpenAI instance created and tested successfully")
+                return llm
                 
             elif self.config.provider == 'anthropic':
                 from langchain_anthropic import ChatAnthropic
