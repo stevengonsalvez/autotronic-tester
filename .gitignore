@@ -168,3 +168,7 @@ agents/autogen-playwright/logs.db
 agents/autogen-playwright/agent_conversations.db
 workspace/
 runtime_logs/
+
+# Ignore cookie files
+examples/cookies/
+cookies/

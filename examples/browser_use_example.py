@@ -3,6 +3,12 @@ Example script demonstrating the use of browser_use's Agent with AutoGen.
 
 This example shows how to use browser_use as an alternative to Playwright
 for browser automation in LLM-powered testing.
+
+Environment Variables:
+    OPENAI_API_KEY (required): Your OpenAI API key
+    LLM_API_KEY (alternative): Alternative way to provide OpenAI API key
+    BROWSER_HEADLESS: Set to 'true' to run browser in headless mode (default: false)
+    BROWSER_COOKIES_FILE: Path to JSON file containing cookies (e.g., ./examples/cookies/cookies.json)
 """
 import os
 import asyncio
@@ -28,47 +34,42 @@ if src_path not in sys.path:
 from src.autogen_playwright.skills.browser_use_skill import BrowserUseSkill
 
 async def run_test_with_browser_use():
-    """Run an example test using browser_use's Agent"""
+    """Run a test using browser-use Agent with AutoGen"""
     try:
         # Load environment variables
         load_dotenv()
         logger.info("Loaded environment variables")
         
-        # Create BrowserUseSkill instance
-        # You can specify custom Chrome path if needed:
-        # chrome_path = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'  # macOS
-        # chrome_path = 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe'  # Windows
-        # chrome_path = '/usr/bin/google-chrome'  # Linux
-        
-        # Get headless mode from environment variable, default to False
-        headless_str = os.getenv('BROWSER_HEADLESS', 'false').lower()
-        headless = headless_str == 'true'
+        # Get headless mode from environment
+        headless = os.getenv('BROWSER_HEADLESS', 'false').lower() == 'true'
         logger.info(f"Browser headless mode: {headless}")
         
-        # Create screenshots directory
-        screenshots_dir = Path("./screenshots")
-        screenshots_dir.mkdir(exist_ok=True)
+        # Set the cookies file path
+        cookies_file = str(Path(__file__).parent / "cookies" / "cookies.json")
+        os.environ["BROWSER_COOKIES_FILE"] = cookies_file
+        if os.path.exists(cookies_file):
+            logger.info(f"Using cookies file at: {cookies_file}")
+        else:
+            logger.warning(f"Cookies file not found at: {cookies_file}")
         
+        # Create browser-use skill
         skill = BrowserUseSkill(
-            screenshot_dir=screenshots_dir,
             headless=headless,
-            skip_test=True  # Skip the initial test that goes to Google
+            skip_test=True  # Skip the initial test task
         )
-        logger.info("Created BrowserUseSkill instance")
         
-        # Set up the browser and agent
+        # Set up the skill
         await skill.setup()
-        logger.info("Set up browser_use browser and agent")
         
         # Define test steps
         test_steps = [
             "Navigate to ee.co.uk",
-            "Accept cookies in the OneTrust banner",
-            "Hover over 'Broadband' in the global navigation menu",
-            "click to 'explore broadband' within the submenu pop up on the hover",
-            "Analyze and summarize the page content",
-            "Then go and enter postcode as UB87PE in the postcode field and click continue",
-            "Analyze and summarize the page"
+            "Check if cookie consent banner appears and accept if it does",
+            "Click on 'Check Coverage' button",
+            "Enter postcode UB87PE",
+            "Click 'Check Coverage' button",
+            "Wait for results to load",
+            "Take a screenshot of the results"
         ]
         
         # Format steps as a single task
@@ -83,26 +84,23 @@ Please take screenshots at each step. Make sure to capture evidence of each impo
         logger.info(f"Executing task:\n{task}")
         
         # Execute the task
-        start_time = time.time()
         result = await skill.execute_task(task)
-        end_time = time.time()
-        
-        logger.info(f"Task completed in {end_time - start_time:.2f} seconds")
-        logger.info(f"Result: {result}")
-        
-        # Wait for user input before closing
-        input("Press Enter to close the browser...")
         
         # Clean up
         await skill.cleanup()
-        logger.info("Resources cleaned up")
         
-        return 0
+        logger.info(f"Test completed successfully: {result}")
+        return result
+        
     except Exception as e:
         logger.error(f"Error running test: {str(e)}", exc_info=True)
-        return 1
+        raise
 
 if __name__ == "__main__":
     # Run the EE example
     exit_code = asyncio.run(run_test_with_browser_use())
+    if exit_code == 0:
+        logger.info("Test completed successfully")
+    else:
+        logger.error(f"Test failed with exit code: {exit_code}")
     os._exit(exit_code)

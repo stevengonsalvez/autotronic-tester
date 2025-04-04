@@ -190,4 +190,42 @@ with tempfile.TemporaryDirectory() as cache_dir:
 This is an experimental project and contributions are welcome. Please feel free to submit issues and pull requests.
 
 ## License
-MIT License 
+MIT License
+
+## Environment Variables
+
+The project uses several environment variables to configure its behavior. You can set these in a `.env` file in the project root or examples directory. See `examples/.env.example` for a template.
+
+### Required Environment Variables
+
+- `OPENAI_API_KEY` or `LLM_API_KEY`: Your OpenAI API key for LLM access
+
+### Optional Environment Variables
+
+- `BROWSER_HEADLESS`: Set to `true` to run browsers in headless mode, `false` to show the browser (default: `false`)
+- `BROWSER_COOKIES_FILE`: Path to a cookies JSON file to load into the browser session
+- `SCREENSHOT_DIR`: Directory to save screenshots (default: `./screenshots`)
+
+## Using Browser Cookies
+
+You can provide browser cookies to avoid login prompts or cookie consent banners. Export cookies from your browser and save them in the proper format:
+
+```json
+[
+  {
+    "name": "cookie_name",
+    "value": "cookie_value",
+    "domain": ".example.com",
+    "path": "/"
+  },
+  ...
+]
+```
+
+Then set the `BROWSER_COOKIES_FILE` environment variable to point to your cookies file:
+
+```
+BROWSER_COOKIES_FILE=./examples/cookies/cookies.json
+```
+
+The cookies will be loaded automatically when the browser starts. 
