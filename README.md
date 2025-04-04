@@ -229,3 +229,6 @@ BROWSER_COOKIES_FILE=./examples/cookies/cookies.json
 ```
 
 The cookies will be loaded automatically when the browser starts. 
+
+
+>note: browserconfig viewport_expansion = -1 
