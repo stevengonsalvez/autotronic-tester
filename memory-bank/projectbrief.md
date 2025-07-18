@@ -24,7 +24,7 @@ Autogen-Tester is a Python framework that integrates Microsoft's AutoGen with th
 ## Technical Requirements
 
 1. **Dependencies**:
-   - Replace pyautogen with autogen-core, autogen-agentchat, and autogen-ext
+   - Replace ag2 with autogen-core, autogen-agentchat, and autogen-ext
    - Maintain compatibility with Playwright >=1.41.0
 
 2. **Agent Implementation**:
