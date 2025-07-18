@@ -5,7 +5,7 @@
 ### Core Framework
 - **Python**: Primary programming language (>=3.9)
 - **AutoGen**: LLM agent framework
-  - v0.2 (current): pyautogen >=0.2.0
+  - v0.2 (current): ag2 >=0.2.0
   - v0.4 (target): autogen-core, autogen-agentchat, autogen-ext
 
 ### Web Testing
